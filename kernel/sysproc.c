@@ -75,13 +75,32 @@ sys_sleep(void)
   return 0;
 }
 
-
 #ifdef LAB_PGTBL
 int
 sys_pgaccess(void)
 {
-  // lab pgtbl: your code here.
-  return 0;
+	uint64 addr;
+	int bitmask;
+	int len;
+
+	if(argaddr(0,&addr) < 0 || argint(1,&len) < 0 || argint(2,&bitmask) < 0)
+		return -1;
+	if(len > 32 || len < 0)
+		return -1;
+
+	int res = 0;
+	struct proc *p =myproc();
+
+	for(int i=0,va,abit;i<len;++i){
+		va = addr + i*PGSIZE;
+		abit = vm_pgaccess(p->pagetable,va);
+		res = res | abit << i;
+	}
+
+	if(copyout(p->pagetable, bitmask, (char *) &res, sizeof(res)) < 0)
+		return -1;
+
+	return 0;
 }
 #endif
 
