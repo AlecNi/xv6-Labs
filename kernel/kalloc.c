@@ -21,12 +21,17 @@ struct run {
 struct {
   struct spinlock lock;
   struct run *freelist;
-} kmem;
+} kmems[NCPU];
 
 void
 kinit()
 {
-  initlock(&kmem.lock, "kmem");
+	char name[8];
+	
+	for(int i=0;i<NCPU;++i){
+		snprintf(name,8,"kmem_%d",i);
+		initlock(&(kmems[i].lock),"kmem");
+	}
   freerange(end, (void*)PHYSTOP);
 }
 
@@ -47,6 +52,7 @@ void
 kfree(void *pa)
 {
   struct run *r;
+  int id;
 
   if(((uint64)pa % PGSIZE) != 0 || (char*)pa < end || (uint64)pa >= PHYSTOP)
     panic("kfree");
@@ -56,10 +62,50 @@ kfree(void *pa)
 
   r = (struct run*)pa;
 
-  acquire(&kmem.lock);
-  r->next = kmem.freelist;
-  kmem.freelist = r;
-  release(&kmem.lock);
+  push_off();
+  id = cpuid();
+  pop_off();
+
+  acquire(&(kmems[id].lock));
+  if(r){
+	  r->next = kmems[id].freelist;
+	  kmems[id].freelist = r;
+  }
+  release(&(kmems[id].lock));
+}
+
+struct run *steal(int id)
+{
+	struct run *fast;
+	struct run *slow;
+	struct run *head;
+
+	push_off();
+	if(id != cpuid())
+		panic("steal failed!\n");
+	pop_off();
+
+	for(int i=0;i<NCPU;++i)
+		if(i != id){
+			acquire(&(kmems[i].lock));
+			if(kmems[i].freelist){
+				slow = head = kmems[i].freelist;
+				fast = slow->next;
+				while(fast){
+					fast = fast->next;
+					if(fast){
+						fast = fast->next;
+						slow = slow->next;
+					}
+				}
+				kmems[i].freelist = slow->next;
+				release(&(kmems[i].lock));
+				slow->next = 0;
+				return head;
+			}
+			release(&(kmems[i].lock));
+		}
+	return 0;
 }
 
 // Allocate one 4096-byte page of physical memory.
@@ -69,12 +115,23 @@ void *
 kalloc(void)
 {
   struct run *r;
+  int id;
 
-  acquire(&kmem.lock);
-  r = kmem.freelist;
+  push_off();
+  id =cpuid();
+  pop_off();
+
+  acquire(&(kmems[id].lock));
+  r = kmems[id].freelist;
   if(r)
-    kmem.freelist = r->next;
-  release(&kmem.lock);
+    kmems[id].freelist = r->next;
+  release(&(kmems[id].lock));
+
+  if(!r && (r = steal(id))){
+	  acquire(&(kmems[id].lock));
+	  kmems[id].freelist = r->next;
+	  release(&(kmems[id].lock));
+  }
 
   if(r)
     memset((char*)r, 5, PGSIZE); // fill with junk
