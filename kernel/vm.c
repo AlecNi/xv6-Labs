@@ -353,7 +353,7 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
 
     if(cow_fault(pagetable,va0)){
 	    if(cow_alloc(pagetable,va0) < 0){
-		    printf("copyout: cow_alloc failed\n");
+		    printf("copyout: cowalloc fail!\n");
 		    return -1;
 	    }
     }
