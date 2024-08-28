@@ -16,10 +16,12 @@ int main(int agrc, char *agrv[])
 	if((pid = fork()) == 0){
 		close(parent[1]);
 		close(child[0]);
-		read(parent[0],child_buf,4);
+		read(parent[0],child_buf,20);
+
+		close(parent[0]);
 		printf("%d: received %s\n",getpid(),child_buf);
 
-		write(child[1],"pong",sizeof(child_buf));
+		write(child[1],"pong",20);
 		exit(0);
 	}
 	//Parent
@@ -28,7 +30,7 @@ int main(int agrc, char *agrv[])
 		close(parent[0]);
 		write(parent[1],"ping",4);
 	
-		read(child[0],parent_buf,sizeof(parent_buf));
+		read(child[0],parent_buf,20);
 		printf("%d: recieved %s\n",getpid(),parent_buf);
 		exit(0);
 	}
