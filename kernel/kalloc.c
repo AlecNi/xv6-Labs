@@ -36,7 +36,7 @@ kinit()
 {
   initlock(&kmem.lock, "kmem");
   kmem.page_cnt = page_count(end,(void*)PHYSTOP);
-  printf("page_cnt: %d\n",kmem.page_cnt);
+  printf("page_count: %d\n",kmem.page_cnt);
   
   kmem.ref_page = end;
   for(int i=0;i<kmem.page_cnt;++i)
@@ -76,7 +76,8 @@ void decr(void *pa)
 int page_count(void *pg_start, void *pg_end)
 {
 	int cnt = 0;
-	char *p = (char*) PGROUNDUP((uint64) pg_start);
+	char *p;
+       	p = (char*) PGROUNDUP((uint64) pg_start);
 	while(p + PGSIZE <= (char*) pg_end){
 		++cnt;
 		p += PGSIZE;
